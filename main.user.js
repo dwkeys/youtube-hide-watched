@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube: Hide Watched Videos
 // @namespace    https://www.haus.gg/
-// @version      6.33
+// @version      6.34
 // @license      MIT
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=youtube.com
 // @description  Hides watched videos, Shorts, Mixes, playlists, members-only videos, and subscribed channels from your YouTube feeds.
@@ -19,8 +19,8 @@
 // @grant        GM_setValue
 // @grant        GM.getValue
 // @grant        GM.setValue
-// @downloadURL https://raw.githubusercontent.com/ceeprus/userscript/main/youtube/youtube-hide-watched.user.js
-// @updateURL https://raw.githubusercontent.com/ceeprus/userscript/main/youtube/youtube-hide-watched.user.js
+// @downloadURL https://raw.githubusercontent.com/ceeprus/youtube-hide-watched/master/main.user.js
+// @updateURL https://raw.githubusercontent.com/ceeprus/youtube-hide-watched/master/main.user.js
 // ==/UserScript==
 
 // To submit bugs or submit revisions please see visit the repository at:
