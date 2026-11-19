@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube: Hide Watched Videos
 // @namespace    https://www.haus.gg/
-// @version      6.32
+// @version      6.33
 // @license      MIT
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=youtube.com
 // @description  Hides watched videos, Shorts, Mixes, playlists, members-only videos, and subscribed channels from your YouTube feeds.
@@ -293,18 +293,54 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 
 	// ===========================================================
 
-	const debounce = function (func, wait, immediate) {
-		let timeout;
-		return (...args) => {
-			const later = () => {
-				timeout = null;
-				if (!immediate) func.apply(this, args);
-			};
-			const callNow = immediate && !timeout;
-			clearTimeout(timeout);
-			timeout = setTimeout(later, wait);
-			if (callNow) func.apply(this, args);
+	const scheduler = (func, wait, maxWait) => {
+		let timeout = null;
+		let firstCall = 0;
+		let running = false;
+		let pending = false;
+		const fire = async () => {
+			timeout = null;
+			firstCall = 0;
+			if (running) {
+				pending = true;
+				return;
+			}
+			running = true;
+			try {
+				await func();
+			} finally {
+				running = false;
+				if (pending) {
+					pending = false;
+					trigger();
+				}
+			}
 		};
+		const trigger = () => {
+			const now = Date.now();
+			if (!firstCall) firstCall = now;
+			clearTimeout(timeout);
+			timeout = setTimeout(
+				fire,
+				Math.max(0, Math.min(wait, firstCall + maxWait - now)),
+			);
+		};
+		return trigger;
+	};
+
+	const setClass = (className, items) => {
+		const wanted = new Set(items);
+		document.querySelectorAll(`.${className}`).forEach((el) => {
+			if (!wanted.has(el)) el.classList.remove(className);
+		});
+		wanted.forEach((el) => {
+			if (!el.classList.contains(className)) el.classList.add(className);
+		});
+	};
+
+	const applyState = (prefix, state, items) => {
+		setClass(`${prefix}-DIMMED`, state === 'dimmed' ? items : []);
+		setClass(`${prefix}-HIDDEN`, state === 'hidden' ? items : []);
 	};
 
 	// ===========================================================
@@ -553,20 +589,18 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 
 	const updateClassOnWatchedItems = async () => {
 		try {
-			// Remove existing classes
-			document.querySelectorAll('.YT-HWV-WATCHED-DIMMED').forEach((el) => {
-				el.classList.remove('YT-HWV-WATCHED-DIMMED');
-			});
-			document.querySelectorAll('.YT-HWV-WATCHED-HIDDEN').forEach((el) => {
-				el.classList.remove('YT-HWV-WATCHED-HIDDEN');
-			});
+			const section = determineYoutubeSection();
+			const state = await stateGet(`YTHWV_STATE_${section}`);
+			const dimmed = new Set();
+			const hidden = new Set();
 
 			// If we're on the History page -- do nothing. We don't want to hide
 			// watched videos here.
-			if (window.location.href.indexOf('/feed/history') >= 0) return;
-
-			const section = determineYoutubeSection();
-			const state = await stateGet(`YTHWV_STATE_${section}`);
+			if (window.location.href.indexOf('/feed/history') >= 0) {
+				setClass('YT-HWV-WATCHED-DIMMED', []);
+				setClass('YT-HWV-WATCHED-HIDDEN', []);
+				return;
+			}
 
 			findWatchedElements().forEach((item, _i) => {
 				let watchedItem;
@@ -641,18 +675,20 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 				}
 
 				if (watchedItem) {
-					// Add current class
 					if (state === 'dimmed') {
-						watchedItem.classList.add('YT-HWV-WATCHED-DIMMED');
+						dimmed.add(watchedItem);
 					} else if (state === 'hidden') {
-						watchedItem.classList.add('YT-HWV-WATCHED-HIDDEN');
+						hidden.add(watchedItem);
 					}
 				}
 
 				if (dimmedItem && (state === 'dimmed' || state === 'hidden')) {
-					dimmedItem.classList.add('YT-HWV-WATCHED-DIMMED');
+					dimmed.add(dimmedItem);
 				}
 			});
+
+			setClass('YT-HWV-WATCHED-DIMMED', dimmed);
+			setClass('YT-HWV-WATCHED-HIDDEN', hidden);
 		} catch (error) {
 			console.error('[YT-HWV]', error);
 		}
@@ -663,26 +699,8 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 	const updateClassOnShortsItems = async () => {
 		try {
 			const section = determineYoutubeSection();
-
-			document.querySelectorAll('.YT-HWV-SHORTS-DIMMED').forEach((el) => {
-				el.classList.remove('YT-HWV-SHORTS-DIMMED');
-			});
-			document.querySelectorAll('.YT-HWV-SHORTS-HIDDEN').forEach((el) => {
-				el.classList.remove('YT-HWV-SHORTS-HIDDEN');
-			});
-
 			const state = await stateGet(`YTHWV_STATE_SHORTS_${section}`);
-
-			const shortsContainers = findShortsContainers();
-
-			shortsContainers.forEach((item) => {
-				// Add current class
-				if (state === 'dimmed') {
-					item.classList.add('YT-HWV-SHORTS-DIMMED');
-				} else if (state === 'hidden') {
-					item.classList.add('YT-HWV-SHORTS-HIDDEN');
-				}
-			});
+			applyState('YT-HWV-SHORTS', state, findShortsContainers());
 		} catch (error) {
 			console.error('[YT-HWV]', error);
 		}
@@ -693,26 +711,8 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 	const updateClassOnMixesItems = async () => {
 		try {
 			const section = determineYoutubeSection();
-
-			document.querySelectorAll('.YT-HWV-MIXES-DIMMED').forEach((el) => {
-				el.classList.remove('YT-HWV-MIXES-DIMMED');
-			});
-			document.querySelectorAll('.YT-HWV-MIXES-HIDDEN').forEach((el) => {
-				el.classList.remove('YT-HWV-MIXES-HIDDEN');
-			});
-
 			const state = await stateGet(`YTHWV_STATE_MIXES_${section}`);
-
-			const mixesContainers = findMixesContainers();
-
-			mixesContainers.forEach((item) => {
-				// Add current class
-				if (state === 'dimmed') {
-					item.classList.add('YT-HWV-MIXES-DIMMED');
-				} else if (state === 'hidden') {
-					item.classList.add('YT-HWV-MIXES-HIDDEN');
-				}
-			});
+			applyState('YT-HWV-MIXES', state, findMixesContainers());
 		} catch (error) {
 			console.error('[YT-HWV]', error);
 		}
@@ -723,26 +723,8 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 	const updateClassOnMembersItems = async () => {
 		try {
 			const section = determineYoutubeSection();
-
-			document.querySelectorAll('.YT-HWV-MEMBERS-DIMMED').forEach((el) => {
-				el.classList.remove('YT-HWV-MEMBERS-DIMMED');
-			});
-			document.querySelectorAll('.YT-HWV-MEMBERS-HIDDEN').forEach((el) => {
-				el.classList.remove('YT-HWV-MEMBERS-HIDDEN');
-			});
-
 			const state = await stateGet(`YTHWV_STATE_MEMBERS_${section}`);
-
-			const membersContainers = findMembersContainers();
-
-			membersContainers.forEach((item) => {
-				// Add current class
-				if (state === 'dimmed') {
-					item.classList.add('YT-HWV-MEMBERS-DIMMED');
-				} else if (state === 'hidden') {
-					item.classList.add('YT-HWV-MEMBERS-HIDDEN');
-				}
-			});
+			applyState('YT-HWV-MEMBERS', state, findMembersContainers());
 		} catch (error) {
 			console.error('[YT-HWV]', error);
 		}
@@ -974,7 +956,9 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 		}
 
 		// Fall back to whatever we had cached
-		if (cached) subbedSet = new Set([...cached.ids, ...cached.handles]);
+		subbedSet = cached
+			? new Set([...cached.ids, ...cached.handles])
+			: new Set();
 		return subbedSet;
 	};
 
@@ -1036,29 +1020,20 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 
 	const updateClassOnSubscribedItems = async () => {
 		try {
-			document.querySelectorAll('.YT-HWV-SUBBED-DIMMED').forEach((el) => {
-				el.classList.remove('YT-HWV-SUBBED-DIMMED');
-			});
-			document.querySelectorAll('.YT-HWV-SUBBED-HIDDEN').forEach((el) => {
-				el.classList.remove('YT-HWV-SUBBED-HIDDEN');
-			});
+			const state = await stateGet('YTHWV_STATE_SUBBED', 'normal');
 
 			// Homepage only: elsewhere this would nuke whole pages.
-			if (location.pathname !== '/') return;
+			if (location.pathname !== '/' || state === 'normal') {
+				applyState('YT-HWV-SUBBED', 'normal', []);
+				return;
+			}
 
-			const state = await stateGet('YTHWV_STATE_SUBBED', 'normal');
-			if (state === 'normal') return;
+			if (!subbedSet) {
+				loadSubs(false).then(run, run);
+				return;
+			}
 
-			if (!subbedSet) await loadSubs(false);
-			if (!subbedSet || subbedSet.size === 0) return;
-
-			findSubscribedContainers().forEach((item) => {
-				if (state === 'dimmed') {
-					item.classList.add('YT-HWV-SUBBED-DIMMED');
-				} else if (state === 'hidden') {
-					item.classList.add('YT-HWV-SUBBED-HIDDEN');
-				}
-			});
+			applyState('YT-HWV-SUBBED', state, findSubscribedContainers());
 		} catch (error) {
 			console.error('[YT-HWV]', error);
 		}
@@ -1243,30 +1218,24 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 		logDebug('Rendered menu buttons');
 	};
 
-	const run = debounce(async (mutations) => {
-		// Don't react if only our own buttons changed state
-		// to avoid running an endless loop
-		if (
-			mutations &&
-			mutations.length === 1 &&
-			mutations[0].target.classList.contains('YT-HWV-BUTTON')
-		) {
-			return;
-		}
-
-		logDebug(
-			'Running check for watched videos, shorts, mixes, members, and subs',
-		);
-		applySubbedTintSetting();
-		await updateClassOnWatchedItems();
-		await updateClassOnShortsItems();
-		await updateClassOnMixesItems();
-		await updateClassOnMembersItems();
-		await updateClassOnSubscribedItems();
-		updateClassOnPlayablesShelves();
-		reflowRichGrids();
-		await renderButtons();
-	}, 250);
+	const run = scheduler(
+		async () => {
+			logDebug(
+				'Running check for watched videos, shorts, mixes, members, and subs',
+			);
+			applySubbedTintSetting();
+			await updateClassOnWatchedItems();
+			await updateClassOnShortsItems();
+			await updateClassOnMixesItems();
+			await updateClassOnMembersItems();
+			await updateClassOnSubscribedItems();
+			updateClassOnPlayablesShelves();
+			reflowRichGrids();
+			await renderButtons();
+		},
+		150,
+		500,
+	);
 
 	// ===========================================================
 
@@ -1288,6 +1257,15 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 						mutations.length === 1 &&
 						mutations[0].addedNodes?.length === 1 &&
 						mutations[0].addedNodes[0]?.classList?.contains('YT-HWV-BUTTONS')
+					) {
+						return;
+					}
+
+					// Don't react if only our own buttons changed state
+					// to avoid running an endless loop
+					if (
+						mutations.length === 1 &&
+						mutations[0].target?.classList?.contains('YT-HWV-BUTTON')
 					) {
 						return;
 					}
