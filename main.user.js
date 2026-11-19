@@ -24,9 +24,9 @@
 // ==/UserScript==
 
 // To submit bugs or submit revisions please see visit the repository at:
-// https://github.com/ceeprus/youtube-hide-watched
+// https://github.com/dwkeys/youtube-hide-watched
 // You can open new issues at:
-// https://github.com/ceeprus/youtube-hide-watched/issues
+// https://github.com/dwkeys/youtube-hide-watched/issues
 
 const REGEX_CHANNEL = /.*\/(user|channel|c)\/.+\/videos/u;
 const REGEX_USER = /.*\/@.*/u;
@@ -68,7 +68,7 @@ const REGEX_SESSION_INDEX = /"SESSION_INDEX":"(\d+)"/;
 	// GM_config setup
 	const title = document.createElement('a');
 	title.textContent = 'YouTube: Hide Watched Videos Settings';
-	title.href = 'https://github.com/ceeprus/youtube-hide-watched';
+	title.href = 'https://github.com/dwkeys/youtube-hide-watched';
 	title.target = '_blank';
 	const gmc = new GM_config({
 		events: {

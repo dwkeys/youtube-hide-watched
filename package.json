@@ -9,13 +9,13 @@
 		"actionless",
 		"netjeff"
 	],
-	"homepage": "https://github.com/ceeprus/youtube-hide-watched",
+	"homepage": "https://github.com/dwkeys/youtube-hide-watched",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ceeprus/youtube-hide-watched.git"
+		"url": "git+https://github.com/dwkeys/youtube-hide-watched.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ceeprus/youtube-hide-watched/issues"
+		"url": "https://github.com/dwkeys/youtube-hide-watched/issues"
 	},
 	"scripts": {
 		"biome:check": "biome check --write",
