@@ -19,8 +19,8 @@
 // @grant        GM_setValue
 // @grant        GM.getValue
 // @grant        GM.setValue
-// @downloadURL https://raw.githubusercontent.com/ceeprus/youtube-hide-watched/master/main.user.js
-// @updateURL https://raw.githubusercontent.com/ceeprus/youtube-hide-watched/master/main.user.js
+// @downloadURL https://raw.githubusercontent.com/dwkeys/youtube-hide-watched/master/main.user.js
+// @updateURL https://raw.githubusercontent.com/dwkeys/youtube-hide-watched/master/main.user.js
 // ==/UserScript==
 
 // To submit bugs or submit revisions please see visit the repository at:
